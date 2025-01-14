@@ -1,3 +1,6 @@
+# PREREQUISITES
+- ripgrep
+
 # INSTALL
 1. compile
 > c3c compile --optlevel=max main.c3
