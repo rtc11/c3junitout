@@ -5,8 +5,8 @@
 1. compile
 > c3c compile --optlevel=max main.c3
 
-2. add executable to path/alias
-> create alias jo="$@" to ~/.bash_profile
+2. add executable to path (e.g. symlink)
+> ln -s /path/to/executable/jo /usr/local/bin/jo
 
 # USAGE
 Show files

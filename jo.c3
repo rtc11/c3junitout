@@ -6,6 +6,7 @@ fn void main(String[] args)
     Path cwd = path::new_cwd()!!;
     String[] files = rg_files();
     bool list;
+
     if (args.len > 1) {
         switch (args[1]) {
             case "list": 
@@ -44,7 +45,7 @@ fn bool stdout(String path, bool print = true)
     for(int i; i<lines.len; i++) {
         if (lines[i].contains("<h2>Standard output</h2>")) has_stdout = true;
         if (lines[i].contains("<pre>")) start = i;
-        if (start != 0 && lines[i].contains("</pre>")) end = i-1; // skip </pre>
+        if (lines[i].contains("</pre>")) end = i-1; // skip </pre>
     }
     if (!has_stdout) return false;
     String[] stdout = lines[start..end];
@@ -63,11 +64,11 @@ fn String parse(String str)
 
     for (int i; i < str.len; i++) {
         switch {
+            case i+1 < str.len && str[i..i+1].contains("?["):
+                result.append('\e');
             case i+1 < str.len && str[i..i+1].contains("\n"):
                 result.append('\n');
                 i++;
-            case i+1 < str.len && str[i..i+1].contains("?["):
-                result.append('\e');
             case i+3 < str.len && str[i..i+3].contains("&gt;"):
                 result.append('>');
                 i+=3;
