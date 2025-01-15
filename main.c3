@@ -61,41 +61,28 @@ fn String parse(String str)
     DString result;
     if (!str.len) return "";
 
-    for (int i; i < str.len - 1; i++) {
-        switch(str[i..i+1])
-        {
-            case "?[": 
-                result.append('\e');
-            case "\\n":
+    for (int i; i < str.len; i++) {
+        switch {
+            case i+1 < str.len && str[i..i+1].contains("\n"):
                 result.append('\n');
                 i++;
-            case "\\&":
-                if(str[i..i+6].contains("\\&quot;")) {
-                    result.append('"');
-                    i += 6;
-                }
-            case "&q":
-                if (str[i..i+5].contains("&quot;")) {
-                    result.append('"');
-                    i += 5;
-                }
-            case "&g":
-                if (str[i..i+3].contains("&gt;")) {
-                    result.append('>');
-                    i += 3;
-                }
-            case "&l":
-                if (str[i..i+3].contains("&lt;")) {
-                    result.append('<');
-                    i += 3;
-                }
-            default: result.append(str[i]);
+            case i+1 < str.len && str[i..i+1].contains("?["):
+                result.append('\e');
+            case i+3 < str.len && str[i..i+3].contains("&gt;"):
+                result.append('>');
+                i+=3;
+            case i+3 < str.len && str[i..i+3].contains("&lt;"):
+                result.append('<');
+                i+=3;
+            case i+5 < str.len && str[i..i+5].contains("&quot;"):
+                result.append('"');
+                i+=5;
+            case i+6 < str.len && str[i..i+6].contains("\\&quot;"):
+                result.append('"');
+                i+=6;
+            default: 
+                result.append(str[i]);
         }
-    }
-
-    // sometimes, because of str[i..i+1] the last char is not appended.
-    if (str.len == result.len() + 1) {
-        result.append(str[str.len-1]);
     }
     return result.str_view();
 }
