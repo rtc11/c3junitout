@@ -3,7 +3,7 @@
 
 # INSTALL
 1. compile
-> c3c compile --optlevel=max main.c3
+> c3c compile --optlevel=max jo.c3
 
 2. add executable to path (e.g. symlink)
 > ln -s /path/to/executable/jo /usr/local/bin/jo
