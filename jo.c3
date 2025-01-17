@@ -43,9 +43,18 @@ fn bool stdout(String path, bool print = true)
     int start, end;
     bool has_stdout;
     for(int i; i<lines.len; i++) {
-        if (lines[i].contains("<h2>Standard output</h2>")) has_stdout = true;
-        if (lines[i].contains("<pre>")) start = i;
-        if (lines[i].contains("</pre>")) end = i-1; // skip </pre>
+        if (lines[i].contains("<h2>Standard output</h2>")) {
+            has_stdout = true;
+            continue;
+        }
+        if (has_stdout && lines[i].contains("<pre>")) {
+            start = i;
+            continue;
+        }
+        if (has_stdout && lines[i].contains("</pre>")) {
+            end = i-1; // skip </pre>
+            break; // done
+        }
     }
     if (!has_stdout) return false;
     String[] stdout = lines[start..end];
