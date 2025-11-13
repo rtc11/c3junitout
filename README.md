@@ -12,11 +12,15 @@
 Show files
 
 > jo list
+
 > jo list utsjekk
+
 > jo list utsjekk.utbetaling
 
 Show stdout
 
-> jo 
+> jo
+
 > jo utsjekk
+
 > jo utsjekk.utbetaling
