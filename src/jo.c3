@@ -3,13 +3,15 @@ module jo;
 import std::io;
 import std::os::process;
 import color;
+import xml;
 
-const VERSION = "0.2";
+const VERSION = "0.3";
 
 faultdef STDOUT_NOT_FOUND;
 
 struct Opts {
     bool list;
+    bool tests;
 }
 
 fn void main(String[] args)
@@ -18,6 +20,9 @@ fn void main(String[] args)
         case "list"     :
         case "--list"   :
         case "-l"       : list(args);
+        case "tests"    :
+        case "--tests"  :
+        case "-t"       : tests(args);
         case "version"  : 
         case "--version": 
         case "-v"       : version(args);
@@ -33,27 +38,35 @@ fn void main(String[] args)
                         case "list"     :
                         case "--list"   :
                         case "-l"       : list(args);
+                        case "tests"    :
+                        case "--tests"  :
+                        case "-t"       : tests(args);
                     }
             }
     }
 }
 
+
 fn void list(String[] args)
 {
     String[] files;
-
-    switch (args.len) {
-        case 1:
-        case 2: files = rg_files(); 
-        case 3: 
-            if (args[1] == "list") files = rg_files(args[2]);
-            if (args[1] == "-l"  ) files = rg_files(args[2]);
-            if (args[2] == "list") files = rg_files(args[1]);
-            if (args[2] == "-l"  ) files = rg_files(args[1]);
-    }
+    list_files(args, &files);
     String cwd = os::getcwd(tmem)!!;
     foreach(file: files) {
         if (file::is_file(file)) io::printfn("%s/%s", cwd, file);
+    }
+}
+
+fn void list_files(String[] args, String[]* files)
+{
+    switch (args.len) {
+        case 1:
+        case 2: *files = rg_files(); 
+        case 3: 
+            if (args[1] == "list") *files = rg_files(args[2]);
+            if (args[1] == "-l"  ) *files = rg_files(args[2]);
+            if (args[2] == "list") *files = rg_files(args[1]);
+            if (args[2] == "-l"  ) *files = rg_files(args[1]);
     }
 }
 
@@ -108,6 +121,73 @@ fn void? stdout(String path)
     }
 }
 
+fn void tests(String[] args)
+{
+    String[] files;
+    io::printfn("args.len: %d", args.len);
+    if (args.len == 2) {
+        files = rg_files();
+    } else {
+        files = rg_files(args[1]);
+    }
+    String cwd = os::getcwd(tmem)!!;
+    foreach(file: files) {
+        if (file::is_file(file)) {
+            if(try file_tests = parse_tests(string::tformat("%s/%s", cwd, file))) {
+                io::printfn("%s", file_tests);
+            }
+        }
+    }
+}
+
+fn String? parse_tests(String path)
+{
+    io::printfn("%s", path);
+    xml::Parser parser = xml::load_file(path)!;
+    Node html = parser.root;
+    NodeList div_class_tab;
+    html.find(fn (node) {
+        if (node.name == "div" && node.attributes.has_key("class")) {
+            if (node.attributes.get("class")!! == "tab") {
+                return true;
+            }
+        }
+        return false;
+    }, &div_class_tab);
+
+    Node test_result_div;
+    foreach(d, div : div_class_tab) {
+        foreach (c, child: div.children) {
+            if (child.value == "Tests") {
+                test_result_div = div;
+            }
+        }
+    }
+
+    Node* table = test_result_div.get("table")!;
+    NodeList trs;
+    table.find(fn (node) {
+        if (node.name == "tr") return true;
+        return false;
+    }, &trs);
+
+    foreach(idx, tr: trs) {
+        NodeList test = tr.children;
+        String name = test[0].value;
+        String duration = test[1].value;
+        String result = test[2].value;
+        switch (result) {
+            case "passed": result = color::green(" "); //  
+            case "ignored": result = color::gray(" "); //  
+            case "failed": result = color::red(" "); //  
+        }
+        if (idx != 0) {
+            io::printfn("%-29s %-9s %s", result, duration, name);
+        }
+    }
+    return "";
+}
+
 fn String parse(String str)
 {
     DString result;
@@ -149,6 +229,7 @@ fn void help(String[] args)
     io::printfn("");
     io::printfn("%s:", commands);
     io::printfn("  list    -l                    list the junit standard out files");
+    io::printfn("  tests   -t                    show the test results");
     io::printfn("");
     io::printfn("%s:", options);
     io::printfn("  -h      help                  print the help");
@@ -161,39 +242,18 @@ fn void version(String[] args)
     io::printfn("%s", VERSION);
 }
 
-module color;
-import std::math::random;
+// ----------------------------------------
+// xml.c3 EXTENSION
+// does not work on references: use .get()
+// ----------------------------------------
 
-const String RESET_COLOR = "\x1b[0m";
-const String ANSI_FG = "\x1b[38;2;%d;%d;%d;m%s%s";
-const String ANSI_BG = "\x1b[48;2;%d;%d;%d;m%s%s";
-const String ANSI_FG_CHAR = "\x1b[38;2;%d;%d;%d;m%c%s";
-
-alias Color = int[3];
-
-fn String String.fg(&self, Color color) => string::tformat(ANSI_FG, color[0], color[1], color[2], *self, color::RESET_COLOR);
-fn String String.bg(&self, Color color) => string::tformat(ANSI_BG, color[0], color[1], color[2], *self, color::RESET_COLOR);
-
-fn String random(String str) => string::tformat(ANSI_FG, rand(150)+50, rand(150)+50, rand(150)+50, str, RESET_COLOR);
-fn String green(String str)  => str.fg({120, 240, 120});   // #78f078
-fn String cyan(String str)   => str.fg({69, 133, 136});    // #458588
-fn String blue(String str)   => str.fg({70, 130, 200});    // #4682C8
-fn String gold(String str)   => str.fg({200, 280, 60});    // #C8B43C
-fn String red(String str)    => str.fg({180, 50, 70});     // #B43246
-fn String pink(String str)   => str.fg({255, 105, 180});   // #FF69B4
-fn String purple(String str) => str.fg({120,  60, 180});   // #783CB4
-fn String gray(String str)   => str.fg({128, 128, 128});   // #808080
-
-fn String rainbow(String str, int span = 1)
+fn Node*? Node.get(&self, String name) @operator([])
 {
-    DString out;
-    Color c = {rand(150)+50, rand(150)+50, rand(150)+50};
-    foreach(i, ch: str) {
-        if (i % span == 0) {
-            c = {rand(150)+50, rand(150)+50, rand(150)+50};
-        }
-        out.append(string::tformat(ANSI_FG_CHAR, c[0], c[1], c[2], ch, RESET_COLOR));
+	if (self.name == name) return self;
+
+	foreach (child: self.children) {
+        if (child.name == name) return @clone(child);
     }
-    return out.str_view();
-} 
+    return NOT_FOUND?;
+}
 
