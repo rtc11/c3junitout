@@ -46,7 +46,6 @@ fn void main(String[] args)
     }
 }
 
-
 fn void list(String[] args)
 {
     String[] files;
@@ -74,10 +73,9 @@ fn void show_stdout(String[] files)
 {
     String cwd = os::getcwd(tmem)!!;
     foreach(file: files) {
-        if (file::is_file(file)) {
-            if(try stdout(string::tformat("%s/%s", cwd, file))) {
-                io::printfn("%s/%s", cwd, file);
-            }
+        if (!file::is_file(file)) continue;
+        if(try standard_output(string::tformat("%s/%s", cwd, file))) {
+            io::printfn("%s/%s", cwd, file);
         }
     }
 }
@@ -93,49 +91,41 @@ fn String[] rg_files(String filter = "")
     return rg_res.str_view().trim().tsplit("\n");  
 }
 
-fn void? stdout(String path)
+fn void? standard_output(String path)
 {
-    String input = (String) file::load_temp(path)!!;
-    String[] lines = input.trim().tsplit("\n");
-    int start, end;
-    bool has_stdout;
-    for(int i; i<lines.len; i++) {
-        if (lines[i].contains("<h2>Standard output</h2>")) {
-            has_stdout = true;
-            continue;
+    xml::Parser parser = xml::load_file(path)!;
+    Node html = parser.root;
+    NodeList div_class_tab;
+    html.find(fn (node) {
+        if (node.name != "div") return false;
+        if (!node.attributes.has_key("class")) return false; 
+        return node.attributes.get("class")!! == "tab";
+    }, &div_class_tab);
+
+    foreach(div : div_class_tab) {
+        foreach (child: div.children) {
+            if (child.value != "Standard output") continue;
+            if (try span = div.get("span")) {
+                if (try pre = span.get("pre")) {
+                    io::printfn("%s", parse(pre.value));
+                }
+            }
         }
-        if (has_stdout && lines[i].contains("<pre>")) {
-            start = i;
-            continue;
-        }
-        if (has_stdout && lines[i].contains("</pre>")) {
-            end = i-1; // skip </pre>
-            break; // done
-        }
-    }
-    if (!has_stdout) return STDOUT_NOT_FOUND?;
-    String[] stdout = lines[start..end];
-    stdout[0] = (String) stdout[0][5..]; // skip <pre>
-    foreach(out: stdout) {
-        io::printfn("%s", parse(out));
     }
 }
 
 fn void tests(String[] args)
 {
     String[] files;
-    io::printfn("args.len: %d", args.len);
-    if (args.len == 2) {
-        files = rg_files();
-    } else {
-        files = rg_files(args[1]);
+    switch (args.len) {
+        case 2: files = rg_files();
+        default: files = rg_files(args[1]);
     }
     String cwd = os::getcwd(tmem)!!;
     foreach(file: files) {
-        if (file::is_file(file)) {
-            if(try file_tests = parse_tests(string::tformat("%s/%s", cwd, file))) {
-                io::printfn("%s", file_tests);
-            }
+        if (!file::is_file(file)) continue; 
+        if(try file_tests = parse_tests(string::tformat("%s/%s", cwd, file))) {
+            io::printfn("%s", file_tests);
         }
     }
 }
@@ -147,29 +137,21 @@ fn String? parse_tests(String path)
     Node html = parser.root;
     NodeList div_class_tab;
     html.find(fn (node) {
-        if (node.name == "div" && node.attributes.has_key("class")) {
-            if (node.attributes.get("class")!! == "tab") {
-                return true;
-            }
-        }
-        return false;
+        if (node.name != "div") return false;
+        if(!node.attributes.has_key("class")) return false; 
+        return node.attributes.get("class")!! == "tab";
     }, &div_class_tab);
 
-    Node test_result_div;
+    Node* table;
     foreach(d, div : div_class_tab) {
         foreach (c, child: div.children) {
-            if (child.value == "Tests") {
-                test_result_div = div;
-            }
+            if (child.value != "Tests") continue;
+            table = div.get("table")!;
         }
     }
 
-    Node* table = test_result_div.get("table")!;
     NodeList trs;
-    table.find(fn (node) {
-        if (node.name == "tr") return true;
-        return false;
-    }, &trs);
+    table.find(fn (node) => node.name == "tr", &trs);
 
     foreach(idx, tr: trs) {
         NodeList test = tr.children;
@@ -177,13 +159,12 @@ fn String? parse_tests(String path)
         String duration = test[1].value;
         String result = test[2].value;
         switch (result) {
-            case "passed": result = color::green(" "); //  
-            case "ignored": result = color::gray(" "); //  
-            case "failed": result = color::red(" "); //  
+            case "passed" : result = color::green(" ");
+            case "ignored": result = color::gray(" ");
+            case "failed" : result = color::red(" ");
         }
-        if (idx != 0) {
-            io::printfn("%-29s %-9s %s", result, duration, name);
-        }
+        if (idx == 0) continue; // headers titles
+        io::printfn("%-29s %-9s %s", result, duration, name);
     }
     return "";
 }
@@ -246,11 +227,9 @@ fn void version(String[] args)
 // xml.c3 EXTENSION
 // does not work on references: use .get()
 // ----------------------------------------
-
 fn Node*? Node.get(&self, String name) @operator([])
 {
 	if (self.name == name) return self;
-
 	foreach (child: self.children) {
         if (child.name == name) return @clone(child);
     }
