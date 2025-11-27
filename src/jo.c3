@@ -178,9 +178,6 @@ fn String parse(String str)
         switch {
             case i+1 < str.len && str[i..i+1].contains("?["):
                 result.append('\e');
-            case i+1 < str.len && str[i..i+1].contains("\n"):
-                result.append('\n');
-                i++;
             case i+3 < str.len && str[i..i+3].contains("&gt;"):
                 result.append('>');
                 i+=3;
